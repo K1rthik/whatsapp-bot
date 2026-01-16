@@ -97,7 +97,7 @@ app.post("/webhook", async (req, res) => {
 /**
  * START SERVER (Railway safe)
  */
-const PORT = 3000;
+const PORT = process.env.PORT ;
 app.listen(PORT, () => {
   console.log(`🚀 Bot running on port ${PORT}`);
 });
