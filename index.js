@@ -2,51 +2,48 @@ import express from "express";
 import twilio from "twilio";
 
 const { MessagingResponse } = twilio.twiml;
-
 const app = express();
 
-/**
- * Twilio sends application/x-www-form-urlencoded
- */
 app.use(express.urlencoded({ extended: false }));
 
-/**
- * Health check
- */
+// Health check
 app.get("/", (req, res) => {
-  res.send("✅ WhatsApp bot is running");
+  res.status(200).send("✅ WhatsApp bot is running");
 });
 
-/**
- * Twilio WhatsApp Webhook
- */
+// WhatsApp webhook
 app.post("/whatsapp", (req, res) => {
-  const incomingMsg = req.body.Body?.trim().toLowerCase();
   const twiml = new MessagingResponse();
+  const incomingMsg = req.body.Body;
 
-  console.log("📩 Incoming message:", incomingMsg);
+  console.log("📩 Raw payload:", req.body);
 
-  if (incomingMsg === "hi") {
+  if (!incomingMsg) {
+    // Ignore delivery/status callbacks
+    res.type("text/xml");
+    return res.send(twiml.toString());
+  }
+
+  const msg = incomingMsg.trim().toLowerCase();
+  console.log("📩 Incoming message:", msg);
+
+  if (msg === "hi") {
     twiml.message("Hello 👋\nYour WhatsApp bot is working ✅");
-  } 
-  else if (incomingMsg === "help") {
+  } else if (msg === "help") {
     twiml.message(
       "Menu:\n" +
       "hi - Greeting\n" +
       "help - Show menu"
     );
-  } 
-  else {
-    twiml.message(`You said: "${incomingMsg}"`);
+  } else {
+    twiml.message(`You said: "${msg}"`);
   }
 
   res.type("text/xml");
   res.send(twiml.toString());
 });
 
-/**
- * Railway-compatible PORT
- */
+// Railway port
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
