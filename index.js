@@ -6,11 +6,14 @@ const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 
+// Simple in-memory sessions
+const sessions = {};
+
 /**
  * Health check
  */
 app.get("/", (req, res) => {
-  res.send("✅ WhatsApp chatbot is running");
+  res.send("✅ WhatsApp Appointment & Support Bot is running");
 });
 
 /**
@@ -18,9 +21,9 @@ app.get("/", (req, res) => {
  */
 app.post("/whatsapp", (req, res) => {
   const twiml = new MessagingResponse();
+  const from = req.body.From;
   const incomingMsg = req.body.Body;
 
-  // Ignore empty callbacks
   if (!incomingMsg) {
     res.type("text/xml");
     return res.send(twiml.toString());
@@ -28,86 +31,139 @@ app.post("/whatsapp", (req, res) => {
 
   const msg = incomingMsg.trim().toLowerCase();
 
-  console.log("📩 Incoming:", msg);
+  if (!sessions[from]) {
+    sessions[from] = { step: "START" };
+  }
 
-  /* ---------- MAIN MENU ---------- */
-  if (msg === "hi" || msg === "hello" || msg === "menu") {
+  const session = sessions[from];
+
+  console.log("📩", from, msg);
+
+  /* ---------------- MAIN MENU ---------------- */
+  if (msg === "hi" || msg === "menu" || session.step === "START") {
+    session.step = "MAIN_MENU";
     twiml.message(
       "👋 *Welcome!*\n\n" +
-      "How can I help you today?\n\n" +
-      "1️⃣ Services\n" +
-      "2️⃣ Pricing\n" +
-      "3️⃣ Support\n" +
-      "4️⃣ Contact\n" +
-      "5️⃣ FAQ\n\n" +
-      "Reply with a number or type *menu* anytime."
+      "Please choose an option:\n\n" +
+      "1️⃣ Book Appointment\n" +
+      "2️⃣ Support / Issue\n" +
+      "3️⃣ Sales Enquiry\n" +
+      "4️⃣ Talk to Human\n\n" +
+      "Reply with a number."
     );
   }
 
-  /* ---------- SERVICES ---------- */
-  else if (msg === "1" || msg.includes("service")) {
+  /* ---------------- APPOINTMENT ---------------- */
+  else if (session.step === "MAIN_MENU" && msg === "1") {
+    session.step = "APPOINTMENT_TYPE";
     twiml.message(
-      "🛠 *Our Services*\n\n" +
-      "• Web Development\n" +
-      "• Mobile App Development\n" +
-      "• WhatsApp Chatbots\n" +
-      "• API Integration\n\n" +
+      "📅 *Book Appointment*\n\n" +
+      "Choose appointment type:\n\n" +
+      "1️⃣ Consultation\n" +
+      "2️⃣ Demo\n" +
+      "3️⃣ Support Meeting"
+    );
+  }
+
+  else if (session.step === "APPOINTMENT_TYPE") {
+    session.appointmentType = msg;
+    session.step = "APPOINTMENT_DATE";
+    twiml.message("📆 Please enter preferred *date* (DD-MM-YYYY)");
+  }
+
+  else if (session.step === "APPOINTMENT_DATE") {
+    session.date = msg;
+    session.step = "APPOINTMENT_TIME";
+    twiml.message("⏰ Please enter preferred *time* (e.g. 11:30 AM)");
+  }
+
+  else if (session.step === "APPOINTMENT_TIME") {
+    const appointmentId = "APT-" + Date.now().toString().slice(-6);
+
+    console.log("📅 Appointment Created:", {
+      appointmentId,
+      from,
+      type: session.appointmentType,
+      date: session.date,
+      time: msg,
+    });
+
+    twiml.message(
+      "✅ *Appointment Confirmed!*\n\n" +
+      `📅 Appointment ID: *${appointmentId}*\n` +
+      `📆 Date: ${session.date}\n` +
+      `⏰ Time: ${msg}\n\n` +
+      "Our team will contact you.\n\n" +
+      "Type *menu* to go back."
+    );
+
+    sessions[from] = { step: "START" };
+  }
+
+  /* ---------------- SUPPORT / TICKET ---------------- */
+  else if (session.step === "MAIN_MENU" && msg === "2") {
+    session.step = "SUPPORT_TYPE";
+    twiml.message(
+      "🎫 *Support / Issue*\n\n" +
+      "Choose issue type:\n\n" +
+      "1️⃣ Technical Issue\n" +
+      "2️⃣ Billing Issue\n" +
+      "3️⃣ Account Issue\n" +
+      "4️⃣ Other"
+    );
+  }
+
+  else if (session.step === "SUPPORT_TYPE") {
+    session.issueType = msg;
+    session.step = "SUPPORT_DESC";
+    twiml.message("📝 Please describe your issue briefly.");
+  }
+
+  else if (session.step === "SUPPORT_DESC") {
+    const ticketId = "TKT-" + Date.now().toString().slice(-6);
+
+    console.log("🎫 Ticket Created:", {
+      ticketId,
+      from,
+      issueType: session.issueType,
+      description: msg,
+    });
+
+    twiml.message(
+      "✅ *Support Ticket Created!*\n\n" +
+      `🎫 Ticket ID: *${ticketId}*\n\n` +
+      "Our support team will contact you soon.\n\n" +
+      "Type *menu* to go back."
+    );
+
+    sessions[from] = { step: "START" };
+  }
+
+  /* ---------------- SALES ---------------- */
+  else if (session.step === "MAIN_MENU" && msg === "3") {
+    twiml.message(
+      "📈 *Sales Enquiry*\n\n" +
+      "Please contact:\n" +
+      "📧 sales@example.com\n" +
+      "📱 +91 98765 43210\n\n" +
       "Type *menu* to go back."
     );
   }
 
-  /* ---------- PRICING ---------- */
-  else if (msg === "2" || msg.includes("price")) {
+  /* ---------------- HUMAN ---------------- */
+  else if (session.step === "MAIN_MENU" && msg === "4") {
     twiml.message(
-      "💰 *Pricing Info*\n\n" +
-      "• Basic Bot: ₹5,000\n" +
-      "• Business Bot: ₹10,000\n" +
-      "• Custom Solutions: Contact us\n\n" +
+      "👤 *Talk to Human*\n\n" +
+      "Our executive will contact you shortly.\n\n" +
       "Type *menu* to go back."
     );
   }
 
-  /* ---------- SUPPORT ---------- */
-  else if (msg === "3" || msg.includes("support")) {
-    twiml.message(
-      "🆘 *Support*\n\n" +
-      "We’re here to help!\n\n" +
-      "📧 Email: support@example.com\n" +
-      "⏰ Support hours: 10 AM – 6 PM\n\n" +
-      "Type *menu* to go back."
-    );
-  }
-
-  /* ---------- CONTACT ---------- */
-  else if (msg === "4" || msg.includes("contact")) {
-    twiml.message(
-      "📞 *Contact Us*\n\n" +
-      "📱 Phone: +91 98765 43210\n" +
-      "📧 Email: contact@example.com\n" +
-      "🌐 Website: www.example.com\n\n" +
-      "Type *menu* to go back."
-    );
-  }
-
-  /* ---------- FAQ ---------- */
-  else if (msg === "5" || msg.includes("faq")) {
-    twiml.message(
-      "❓ *Frequently Asked Questions*\n\n" +
-      "Q1: Is this bot 24/7?\n" +
-      "👉 Yes, always online.\n\n" +
-      "Q2: Can I customize it?\n" +
-      "👉 Yes, fully customizable.\n\n" +
-      "Q3: Is WhatsApp API paid?\n" +
-      "👉 Yes, per conversation.\n\n" +
-      "Type *menu* to go back."
-    );
-  }
-
-  /* ---------- FALLBACK ---------- */
+  /* ---------------- FALLBACK ---------------- */
   else {
     twiml.message(
-      "🤔 Sorry, I didn’t understand that.\n\n" +
-      "Type *menu* to see options."
+      "🤔 I didn’t understand that.\n\n" +
+      "Type *menu* to start again."
     );
   }
 
@@ -120,5 +176,5 @@ app.post("/whatsapp", (req, res) => {
  */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Chatbot running on port ${PORT}`);
+  console.log(`🚀 Bot running on port ${PORT}`);
 });
