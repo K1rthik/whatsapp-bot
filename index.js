@@ -1,11 +1,12 @@
 import express from "express";
-import { MessagingResponse } from "twilio";
+import twilio from "twilio";
+
+const { MessagingResponse } = twilio.twiml;
 
 const app = express();
 
 /**
- * IMPORTANT:
- * Twilio sends data as application/x-www-form-urlencoded
+ * Twilio sends application/x-www-form-urlencoded
  */
 app.use(express.urlencoded({ extended: false }));
 
@@ -20,23 +21,23 @@ app.get("/", (req, res) => {
  * Twilio WhatsApp Webhook
  */
 app.post("/whatsapp", (req, res) => {
-  const incomingMsg = req.body.Body?.toLowerCase();
+  const incomingMsg = req.body.Body?.trim().toLowerCase();
   const twiml = new MessagingResponse();
 
-  console.log("📩 Message received:", incomingMsg);
+  console.log("📩 Incoming message:", incomingMsg);
 
   if (incomingMsg === "hi") {
+    twiml.message("Hello 👋\nYour WhatsApp bot is working ✅");
+  } 
+  else if (incomingMsg === "help") {
     twiml.message(
-      "Hello 👋\nYour WhatsApp bot is working correctly ✅"
+      "Menu:\n" +
+      "hi - Greeting\n" +
+      "help - Show menu"
     );
-  } else if (incomingMsg === "help") {
-    twiml.message(
-      "Type:\nhi – greeting\nhelp – menu"
-    );
-  } else {
-    twiml.message(
-      `You said: "${incomingMsg}"`
-    );
+  } 
+  else {
+    twiml.message(`You said: "${incomingMsg}"`);
   }
 
   res.type("text/xml");
@@ -44,7 +45,7 @@ app.post("/whatsapp", (req, res) => {
 });
 
 /**
- * Railway PORT
+ * Railway-compatible PORT
  */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
