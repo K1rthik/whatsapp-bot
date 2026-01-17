@@ -6,29 +6,17 @@ dotenv.config();
 
 const app = express();
 
-/**
- * REQUIRED middleware
- */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/**
- * ENV VARIABLES
- */
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
-/**
- * HEALTH CHECK (IMPORTANT)
- */
 app.get("/", (req, res) => {
   res.status(200).send("✅ WhatsApp bot is running");
 });
 
-/**
- * WEBHOOK VERIFICATION (Meta)
- */
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
