@@ -17,8 +17,7 @@ app.post("/whatsapp", (req, res) => {
   const twiml = new MessagingResponse();
   twiml.message("✅ Bot connected successfully!");
 
-  res.set("Content-Type", "text/xml");
-  res.send(twiml.toString());
+  res.type("text/xml").send(twiml.toString());
 });
 
 const PORT = process.env.PORT || 3000;
