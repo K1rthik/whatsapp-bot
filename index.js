@@ -1,29 +1,27 @@
 import express from "express";
 import twilio from "twilio";
 
-const { MessagingResponse } = twilio.twiml;
 const app = express();
+const { MessagingResponse } = twilio.twiml;
 
 app.use(express.urlencoded({ extended: false }));
 
-const sessions = {};
-
 app.get("/", (req, res) => {
-  res.send("✅ WhatsApp Appointment & Support Bot is running");
+  res.send("Bot is running");
 });
 
 app.post("/whatsapp", (req, res) => {
+  console.log("🔥 Webhook HIT");
+  console.log(req.body);
+
   const twiml = new MessagingResponse();
-  console.log("🔥 Webhook HIT", req.body);
+  twiml.message("✅ Bot connected successfully!");
 
-  twiml.message("✅ Bot connected successfully");
-
-  res.type("text/xml");
+  res.set("Content-Type", "text/xml");
   res.send(twiml.toString());
 });
 
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Bot running on port ${PORT}`);
+  console.log("🚀 Server started on port", PORT);
 });
