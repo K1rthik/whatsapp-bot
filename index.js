@@ -1,32 +1,36 @@
 import express from "express";
 import twilio from "twilio";
 
-const app = express();
 const { MessagingResponse } = twilio.twiml;
+const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 
-/* ---------------- MEMORY ---------------- */
-const sessions = {};
-const tickets = [];
+/* ---------------- IN-MEMORY DATA ---------------- */
 
-/* ---------------- HEALTH ---------------- */
+const sessions = {};
+
+const tickets = {
+  open: [
+    { id: "SR/25-26/17618", group: "ICT", priority: "Medium", assignee: "Sharmini Rajendran" },
+    { id: "SR/25-26/17621", group: "Electrical", priority: "Medium", assignee: "Raja M" }
+  ],
+  closed: [{ id: "SR/25-26/17610", group: "NOC", date: "19/01/2026" }],
+  hold: [{ id: "SR/25-26/17605", reason: "Awaiting HOD approval" }]
+};
+
+/* ---------------- HEALTH CHECK ---------------- */
+
 app.get("/", (req, res) => {
-  res.send("✅ KGISL WhatsApp Support Bot is running");
+  res.send("✅ KGISL WhatsApp Support Desk is running");
 });
 
 /* ---------------- WEBHOOK ---------------- */
+
 app.post("/whatsapp", (req, res) => {
   const twiml = new MessagingResponse();
   const from = req.body.From;
-  const body = req.body.Body;
-
-  if (!body) {
-    res.type("text/xml");
-    return res.send(twiml.toString());
-  }
-
-  const msg = body.trim().toLowerCase();
+  const msg = req.body.Body?.trim().toLowerCase();
 
   if (!sessions[from]) {
     sessions[from] = { step: "MENU" };
@@ -34,92 +38,159 @@ app.post("/whatsapp", (req, res) => {
 
   const s = sessions[from];
 
-  console.log("📩", from, msg, s.step);
+  console.log("📩", from, msg, "STEP:", s.step);
 
-  /* ---------- MAIN MENU ---------- */
+  /* ---------------- MAIN MENU ---------------- */
   if (msg === "hi" || msg === "menu") {
     s.step = "MENU";
     twiml.message(
-      "👋 * KGISL Support*\n\n" +
+      "👋 * KGISL Support *\n\n" +
       "1️⃣ Raise New Ticket\n" +
-      "2️⃣ My Tickets\n" +
-      "3️⃣ Book Appointment\n" +
-      "4️⃣ Contact Support\n\n" +
-      "Reply with a number"
+      "2️⃣ My Open Tickets\n" +
+      "3️⃣ My Closed Tickets\n" +
+      "4️⃣ Tickets On Hold\n" +
+      "5️⃣ Department Tickets\n" +
+      "6️⃣ Knowledge Base\n" +
+      "7️⃣ Contact Support\n\n" +
+      "Reply with a number."
     );
   }
 
-  /* ---------- RAISE TICKET ---------- */
+  /* ---------------- RAISE TICKET ---------------- */
   else if (s.step === "MENU" && msg === "1") {
-    s.step = "TICKET_SUMMARY";
-    twiml.message("📝 Please describe your issue briefly");
+    s.step = "TASK_GROUP";
+    twiml.message(
+      "🛠 *Select Task Group*\n\n" +
+      "1️⃣ Electrical\n" +
+      "2️⃣ Housekeeping\n" +
+      "3️⃣ ICT\n" +
+      "4️⃣ NOC\n" +
+      "5️⃣ Carpentry"
+    );
   }
 
-  else if (s.step === "TICKET_SUMMARY") {
-    const id = "SR-" + Date.now().toString().slice(-6);
-    tickets.push({ id, from, summary: msg });
+  else if (s.step === "TASK_GROUP") {
+    s.taskGroup = msg;
+    s.step = "NATURE";
+    twiml.message(
+      "🔧 *Nature of Work*\n\n" +
+      "1️⃣ Repair / Fix\n" +
+      "2️⃣ Installation\n" +
+      "3️⃣ Relocation\n" +
+      "4️⃣ Maintenance\n" +
+      "5️⃣ Others"
+    );
+  }
+
+  else if (s.step === "NATURE") {
+    s.nature = msg;
+    s.step = "PRIORITY";
+    twiml.message("⚠️ *Set Priority*\n\n1️⃣ Low\n2️⃣ Medium\n3️⃣ High");
+  }
+
+  else if (s.step === "PRIORITY") {
+    s.priority = msg;
+    s.step = "SUMMARY";
+    twiml.message("📝 Please describe the issue briefly.");
+  }
+
+  else if (s.step === "SUMMARY") {
+    s.summary = msg;
+    s.step = "CONFIRM";
+    twiml.message(
+      "📋 *Review Ticket*\n\n" +
+      `Group: ${s.taskGroup}\n` +
+      `Nature: ${s.nature}\n` +
+      `Priority: ${s.priority}\n` +
+      `Issue: ${s.summary}\n\n` +
+      "1️⃣ Confirm & Create\n2️⃣ Cancel"
+    );
+  }
+
+  else if (s.step === "CONFIRM" && msg === "1") {
+    const id = "SR/25-26/" + Math.floor(Math.random() * 90000);
+    tickets.open.push({ id, group: s.taskGroup, priority: s.priority });
 
     twiml.message(
-      "✅ *Ticket Created*\n\n" +
-      `🎫 Ticket ID: *${id}*\n\n` +
-      "Our team will contact you.\n\n" +
-      "Type *menu* to return"
+      "✅ *Ticket Created Successfully!*\n\n" +
+      `🎫 Ticket No: ${id}\n` +
+      "Status: Open\n\n" +
+      "Type *menu* to return."
     );
 
-    s.step = "MENU";
+    sessions[from] = { step: "MENU" };
   }
 
-  /* ---------- MY TICKETS ---------- */
+  else if (s.step === "CONFIRM" && msg === "2") {
+    sessions[from] = { step: "MENU" };
+    twiml.message("❌ Ticket cancelled.\n\nType *menu* to start again.");
+  }
+
+  /* ---------------- MY OPEN ---------------- */
   else if (s.step === "MENU" && msg === "2") {
-    if (tickets.length === 0) {
-      twiml.message("📂 No tickets found.\n\nType *menu*");
-    } else {
-      let text = "📂 *My Tickets*\n\n";
-      tickets.forEach((t, i) => {
-        text += `${i + 1}. ${t.id} – ${t.summary}\n`;
-      });
-      text += "\nType *menu*";
-      twiml.message(text);
-    }
+    let text = "📂 *My Open Tickets*\n\n";
+    tickets.open.forEach((t, i) => {
+      text += `${i + 1}️⃣ ${t.id} – ${t.group} – ${t.priority}\n`;
+    });
+    text += "\nType *menu* to go back.";
+    twiml.message(text);
   }
 
-  /* ---------- APPOINTMENT ---------- */
+  /* ---------------- MY CLOSED ---------------- */
   else if (s.step === "MENU" && msg === "3") {
-    s.step = "APPOINT_DATE";
-    twiml.message("📆 Enter appointment date (DD-MM-YYYY)");
+    let text = "📁 *My Closed Tickets*\n\n";
+    tickets.closed.forEach((t, i) => {
+      text += `${i + 1}️⃣ ${t.id} – ${t.group}\n`;
+    });
+    text += "\nType *menu* to go back.";
+    twiml.message(text);
   }
 
-  else if (s.step === "APPOINT_DATE") {
-    s.date = msg;
-    s.step = "APPOINT_TIME";
-    twiml.message("⏰ Enter appointment time (e.g. 11:30 AM)");
-  }
-
-  else if (s.step === "APPOINT_TIME") {
-    const id = "APT-" + Date.now().toString().slice(-6);
-    twiml.message(
-      "✅ *Appointment Booked*\n\n" +
-      `📅 ID: ${id}\n` +
-      `📆 Date: ${s.date}\n` +
-      `⏰ Time: ${msg}\n\n` +
-      "Type *menu*"
-    );
-    s.step = "MENU";
-  }
-
-  /* ---------- CONTACT ---------- */
+  /* ---------------- ON HOLD ---------------- */
   else if (s.step === "MENU" && msg === "4") {
+    let text = "⏸ *Tickets On Hold*\n\n";
+    tickets.hold.forEach((t, i) => {
+      text += `${i + 1}️⃣ ${t.id} – ${t.reason}\n`;
+    });
+    text += "\nType *menu* to go back.";
+    twiml.message(text);
+  }
+
+  /* ---------------- DEPARTMENT ---------------- */
+  else if (s.step === "MENU" && msg === "5") {
+    twiml.message(
+      "🏢 *Department Tickets – ICT*\n\n" +
+      "Open: 12\nClosed: 98\nOn Hold: 4\n\n" +
+      "Type *menu* to return."
+    );
+  }
+
+  /* ---------------- KNOWLEDGE BASE ---------------- */
+  else if (s.step === "MENU" && msg === "6") {
+    twiml.message(
+      "📚 *Knowledge Base*\n\n" +
+      "1️⃣ Internet Issues\n" +
+      "2️⃣ AC / Electrical\n" +
+      "3️⃣ CCTV / Security\n" +
+      "4️⃣ Hardware\n\n" +
+      "Type *menu* to return."
+    );
+  }
+
+  /* ---------------- CONTACT ---------------- */
+  else if (s.step === "MENU" && msg === "7") {
     twiml.message(
       "📞 *Contact Support*\n\n" +
       "📧 support@kgisl.com\n" +
-      "📱 +91 99523 41032\n\n" +
-      "Type *menu*"
+      "📱 +91 9952341032\n" +
+      "⏰ 10 AM – 6 PM\n\n" +
+      "Type *menu* to return."
     );
   }
 
-  /* ---------- FALLBACK ---------- */
+  /* ---------------- FALLBACK ---------------- */
   else {
-    twiml.message("❓ Invalid input. Type *menu*");
+    twiml.message("❓ Invalid option. Type *menu* to start again.");
   }
 
   res.type("text/xml");
@@ -127,7 +198,8 @@ app.post("/whatsapp", (req, res) => {
 });
 
 /* ---------------- PORT ---------------- */
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Bot running on port ${PORT}`);
+  console.log(`🚀 KGISL WhatsApp Bot running on port ${PORT}`);
 });
