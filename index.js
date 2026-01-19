@@ -44,7 +44,7 @@ app.post("/whatsapp", (req, res) => {
   if (msg === "hi" || msg === "menu") {
     s.step = "MENU";
     twiml.message(
-      "👋 * KGISL Support *\n\n" +
+      "👋 *Welcome to KGISL Support Desk*\n\n" +
       "1️⃣ Raise New Ticket\n" +
       "2️⃣ My Open Tickets\n" +
       "3️⃣ My Closed Tickets\n" +
