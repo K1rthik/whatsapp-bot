@@ -223,6 +223,26 @@
  * FINAL FIXED VERSION (Railway + Meta Test Number)
  */
 
+/**
+ * WhatsApp Cloud API Bot
+ * Railway-compatible FINAL version
+ */
+// {
+//   "name": "whatsapp-twilio-bot",
+//   "version": "1.0.0",
+//   "type": "module",
+//   "main": "index.js",
+//   "scripts": {
+//     "start": "node index.js"
+//   },
+//   "engines": {
+//     "node": ">=18"
+//   },
+//   "dependencies": {
+//     "express": "^4.22.1",
+//     "twilio": "^4.23.0"
+//   }
+// }
 import express from "express";
 import bodyParser from "body-parser";
 import axios from "axios";
@@ -231,15 +251,28 @@ const app = express();
 app.use(bodyParser.json());
 
 /* =========================
-   CONFIG (USE ENV VARS)
+   CONFIG (ENV VARS ONLY)
 ========================= */
-const PORT = process.env.PORT;
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN; // set in Railway
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; // set in Railway
+const PORT = process.env.PORT; // 🚨 DO NOT FALLBACK
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "my_verify_token";
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
 /* =========================
-   HEALTH CHECK (OPTIONAL)
+   SAFETY CHECKS
+========================= */
+if (!PORT) {
+  console.error("❌ PORT not provided by Railway");
+}
+if (!ACCESS_TOKEN) {
+  console.error("❌ ACCESS_TOKEN missing");
+}
+if (!PHONE_NUMBER_ID) {
+  console.error("❌ PHONE_NUMBER_ID missing");
+}
+
+/* =========================
+   HEALTH CHECK
 ========================= */
 app.get("/", (req, res) => {
   res.status(200).send("WhatsApp Bot is running 🚀");
@@ -258,7 +291,6 @@ app.get("/webhook", (req, res) => {
     return res.status(200).send(challenge);
   }
 
-  console.log("❌ Webhook verification failed");
   return res.sendStatus(403);
 });
 
@@ -270,22 +302,18 @@ app.post("/webhook", async (req, res) => {
     const message =
       req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
 
-    if (!message) {
-      return res.sendStatus(200);
-    }
+    if (!message) return res.sendStatus(200);
 
     const from = message.from;
     const text = message.text?.body || "";
 
     console.log("📩 Incoming:", text);
 
-    // IMPORTANT:
-    // For TEST NUMBER we MUST reply using TEMPLATE
     await sendTemplateMessage(from);
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("❌ Webhook error:", err.response?.data || err.message);
+    console.error("❌ Webhook handler error:", err.message);
     res.sendStatus(500);
   }
 });
@@ -299,13 +327,11 @@ async function sendTemplateMessage(to) {
       `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
       {
         messaging_product: "whatsapp",
-        to: to,
+        to,
         type: "template",
         template: {
           name: "hello_world",
-          language: {
-            code: "en_US"
-          }
+          language: { code: "en_US" }
         }
       },
       {
@@ -326,8 +352,8 @@ async function sendTemplateMessage(to) {
 }
 
 /* =========================
-   START SERVER
+   START SERVER (CRITICAL)
 ========================= */
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 WhatsApp bot running on port ${PORT}`);
 });

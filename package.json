@@ -1,5 +1,6 @@
+
 {
-  "name": "whatsapp-twilio-bot",
+  "name": "whatsapp-cloud-bot",
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
@@ -10,7 +11,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "express": "^4.22.1",
-    "twilio": "^4.23.0"
+    "axios": "^1.6.8",
+    "body-parser": "^1.20.2",
+    "express": "^4.19.2"
   }
 }
