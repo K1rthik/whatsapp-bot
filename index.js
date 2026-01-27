@@ -218,6 +218,11 @@
  * ES Module Version (FIXED)
  */
 
+/**
+ * WhatsApp Cloud API Chatbot
+ * FINAL FIXED VERSION (Railway + Meta Test Number)
+ */
+
 import express from "express";
 import bodyParser from "body-parser";
 import axios from "axios";
@@ -226,16 +231,19 @@ const app = express();
 app.use(bodyParser.json());
 
 /* =========================
-   CONFIG
+   CONFIG (USE ENV VARS)
 ========================= */
-const PORT = process.env.PORT || 3000;
-// Set any string – must match Meta dashboard
-const VERIFY_TOKEN = "my_verify_token";
+const PORT = 3000;
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN; // set in Railway
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; // set in Railway
 
-// From Meta dashboard
-const ACCESS_TOKEN = "EAAQzykkjADYBQlfMOZBMF0rZCMbDKuMAxobm7RpiFUHJUHnqt7yBlrZBp3MDLszmY6zxeYhUhETrh7JKsZB18JFYeWwj4fpuVwFQTNgyZCzBGTqZBW2bZAtej1nj6zSXZAPnIZBBreKC1ZCMVNX7SkoU8yyjKIIwZBk4Idq2o5pcSNmI3CMJwzdt4XtYbBTCgCciZCIXRHmyZCBQqOZBtZBeL85MK3PB6LpqrMI2QbaELWMo5HRDxn80VwFyqZBwYF0sZAi2jBqLJ9RLQiaFibG5zzKKsBZCIi";
-const PHONE_NUMBER_ID = "961397093723196";
-
+/* =========================
+   HEALTH CHECK (OPTIONAL)
+========================= */
+app.get("/", (req, res) => {
+  res.status(200).send("WhatsApp Bot is running 🚀");
+});
 
 /* =========================
    WEBHOOK VERIFICATION
@@ -250,6 +258,7 @@ app.get("/webhook", (req, res) => {
     return res.status(200).send(challenge);
   }
 
+  console.log("❌ Webhook verification failed");
   return res.sendStatus(403);
 });
 
@@ -261,52 +270,59 @@ app.post("/webhook", async (req, res) => {
     const message =
       req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
 
-    if (!message) return res.sendStatus(200);
+    if (!message) {
+      return res.sendStatus(200);
+    }
 
     const from = message.from;
-    const text = message.text?.body?.toLowerCase() || "";
+    const text = message.text?.body || "";
 
     console.log("📩 Incoming:", text);
 
-    let reply = "Sorry, I didn’t understand that.";
+    // IMPORTANT:
+    // For TEST NUMBER we MUST reply using TEMPLATE
+    await sendTemplateMessage(from);
 
-    if (text === "hi" || text === "hello") {
-      reply =
-        "Hello 👋 Welcome to KGChat!\n\n1️⃣ Support\n2️⃣ Sales\n3️⃣ AI Assistant";
-    } else if (text === "1") {
-      reply = "🎫 Support ticket created.";
-    } else if (text === "2") {
-      reply = "💼 Sales team will contact you.";
-    } else if (text === "3") {
-      reply = "🤖 AI coming soon!";
-    }
-
-    await sendMessage(from, reply);
     res.sendStatus(200);
   } catch (err) {
-    console.error("❌ Webhook error:", err.message);
+    console.error("❌ Webhook error:", err.response?.data || err.message);
     res.sendStatus(500);
   }
 });
 
 /* =========================
-   SEND MESSAGE
+   SEND TEMPLATE MESSAGE
 ========================= */
-async function sendMessage(to, text) {
-  await axios.post(
-    `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
-    {
-      messaging_product: "whatsapp",
-      to,
-      text: { body: text }
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
+async function sendTemplateMessage(to) {
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: to,
+        type: "template",
+        template: {
+          name: "hello_world",
+          language: {
+            code: "en_US"
+          }
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          "Content-Type": "application/json"
+        }
       }
-    }
-  );
+    );
+
+    console.log("✅ Template message sent to:", to);
+  } catch (error) {
+    console.error(
+      "❌ Send error:",
+      error.response?.data || error.message
+    );
+  }
 }
 
 /* =========================
