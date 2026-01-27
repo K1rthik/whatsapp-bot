@@ -210,19 +210,25 @@
  * Full Webhook Structure
  */
 
-const express = require("express");
-const bodyParser = require("body-parser");
-const axios = require("axios");
+
+
+
+/**
+ * WhatsApp Cloud API Chatbot
+ * ES Module Version (FIXED)
+ */
+
+import express from "express";
+import bodyParser from "body-parser";
+import axios from "axios";
 
 const app = express();
 app.use(bodyParser.json());
 
 /* =========================
-   CONFIG (CHANGE THESE)
+   CONFIG
 ========================= */
-
 const PORT = process.env.PORT || 3000;
-
 // Set any string – must match Meta dashboard
 const VERIFY_TOKEN = "my_verify_token";
 
@@ -230,9 +236,9 @@ const VERIFY_TOKEN = "my_verify_token";
 const ACCESS_TOKEN = "EAAQzykkjADYBQlfMOZBMF0rZCMbDKuMAxobm7RpiFUHJUHnqt7yBlrZBp3MDLszmY6zxeYhUhETrh7JKsZB18JFYeWwj4fpuVwFQTNgyZCzBGTqZBW2bZAtej1nj6zSXZAPnIZBBreKC1ZCMVNX7SkoU8yyjKIIwZBk4Idq2o5pcSNmI3CMJwzdt4XtYbBTCgCciZCIXRHmyZCBQqOZBtZBeL85MK3PB6LpqrMI2QbaELWMo5HRDxn80VwFyqZBwYF0sZAi2jBqLJ9RLQiaFibG5zzKKsBZCIi";
 const PHONE_NUMBER_ID = "961397093723196";
 
+
 /* =========================
    WEBHOOK VERIFICATION
-   (GET /webhook)
 ========================= */
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
@@ -244,90 +250,63 @@ app.get("/webhook", (req, res) => {
     return res.status(200).send(challenge);
   }
 
-  console.log("❌ Webhook verification failed");
   return res.sendStatus(403);
 });
 
 /* =========================
    RECEIVE MESSAGES
-   (POST /webhook)
 ========================= */
 app.post("/webhook", async (req, res) => {
   try {
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
-    const message = value?.messages?.[0];
+    const message =
+      req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
 
-    if (!message) {
-      return res.sendStatus(200);
-    }
+    if (!message) return res.sendStatus(200);
 
-    const from = message.from; // user's WhatsApp number
-    const msgType = message.type;
+    const from = message.from;
+    const text = message.text?.body?.toLowerCase() || "";
 
-    let incomingText = "";
+    console.log("📩 Incoming:", text);
 
-    if (msgType === "text") {
-      incomingText = message.text.body;
-    }
-
-    console.log("📩 Incoming message:", incomingText);
-
-    // =====================
-    // BOT LOGIC
-    // =====================
     let reply = "Sorry, I didn’t understand that.";
-
-    const text = incomingText.toLowerCase();
 
     if (text === "hi" || text === "hello") {
       reply =
-        "Hello 👋\nWelcome to KGChat!\n\n1️⃣ Support\n2️⃣ Sales\n3️⃣ Talk to AI";
+        "Hello 👋 Welcome to KGChat!\n\n1️⃣ Support\n2️⃣ Sales\n3️⃣ AI Assistant";
     } else if (text === "1") {
-      reply = "🎫 Support ticket created.\nOur team will contact you soon.";
+      reply = "🎫 Support ticket created.";
     } else if (text === "2") {
-      reply = "💼 Sales team notified.\nPlease share your requirement.";
+      reply = "💼 Sales team will contact you.";
     } else if (text === "3") {
-      reply = "🤖 AI assistant coming soon!";
+      reply = "🤖 AI coming soon!";
     }
 
     await sendMessage(from, reply);
-
-    return res.sendStatus(200);
-  } catch (error) {
-    console.error("❌ Error handling message:", error.message);
-    return res.sendStatus(500);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("❌ Webhook error:", err.message);
+    res.sendStatus(500);
   }
 });
 
 /* =========================
-   SEND MESSAGE FUNCTION
+   SEND MESSAGE
 ========================= */
 async function sendMessage(to, text) {
-  try {
-    await axios.post(
-      `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to,
-        text: { body: text }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-        }
+  await axios.post(
+    `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
+    {
+      messaging_product: "whatsapp",
+      to,
+      text: { body: text }
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
       }
-    );
-
-    console.log("✅ Message sent to:", to);
-  } catch (error) {
-    console.error(
-      "❌ Error sending message:",
-      error.response?.data || error.message
-    );
-  }
+    }
+  );
 }
 
 /* =========================
