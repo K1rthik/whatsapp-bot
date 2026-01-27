@@ -233,7 +233,7 @@ app.use(bodyParser.json());
 /* =========================
    CONFIG (USE ENV VARS)
 ========================= */
-const PORT = 3000;
+const PORT = process.env.PORT;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN; // set in Railway
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; // set in Railway
